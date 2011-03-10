@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+
+import httplib2
+import os
+import sys
+
+from netscaler_cli import *
+
+parser = initializeOptions(usage="usage: %prog [options] virtual_server res_policy operation")
+
+(options,args) = parser.parse_args()
+if len(args) != 3:
+    parser.error("No virtual server, policy name or operation given")
+
+vserver_name = args[0]
+policy_name = args[1]
+operation = args[2]
+
+if operation not in ['enable', 'disable']:
+    sys.exit("Invalid operation: " + operation)
+
+log = initializeLog(logger_name=sys.argv[0])
+
+if options.verbose:
+    log.setLevel(logging.INFO)
+    httplib2.debuglevel = 10
+if options.quiet:
+    log.setLevel(logging.ERROR)
+    httplib2.debuglevel = 0
+
+config = initializeConfigParser(options.credentials_file)
+log.info("creds: %s" % config)
+
+client = httplib2.Http(os.path.join(os.environ['HOME'], '.cache'))
+client.add_credentials(config['username'], config['password'])
+
+request = config['ws_url'] + '/virtserver/' + vserver_name + \
+          '/resppolicy/' + policy_name + '/'
+if operation == 'enable':
+    request = request + 'enable/'
+else:
+    request = request + 'disable/'
+
+response, body = client.request(request, method='PUT')
+log.info("response = %s" % response)
+log.info("body = %s" % body)
+
+if response.status != 200:
+    if options.quiet:
+	sys.exit(1)
+    else:
+	sys.exit(body)
+
+print body
+sys.exit(0)
